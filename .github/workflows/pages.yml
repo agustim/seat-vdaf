@@ -22,10 +22,23 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          # Activa GitHub Pages automàticament si encara no està habilitat al repositori
+          enablement: true
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: |
+            .
+            !data/textos/**
+            !tools/**
+            !.github/**
+            !README.md
+            !RESUM-ASSEGURANÇA.md
+            !package.json
+            !package-lock.json
+            !node_modules/**
+            !npm-cache/**
       - name: Deploy
         uses: actions/deploy-pages@v4
         id: deployment
