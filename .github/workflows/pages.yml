@@ -28,17 +28,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: |
-            .
-            !data/textos/**
-            !tools/**
-            !.github/**
-            !README.md
-            !RESUM-ASSEGURANÇA.md
-            !package.json
-            !package-lock.json
-            !node_modules/**
-            !npm-cache/**
+          path: .
       - name: Deploy
         uses: actions/deploy-pages@v4
         id: deployment
