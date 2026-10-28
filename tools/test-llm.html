@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <title>carregant</title>
+</head>
+<body>
+  <pre id="log"></pre>
+  <script type="module">
+    import { BrowserLLM } from '../js/llm.js';
+    const log = (m) => { document.getElementById('log').textContent += m + '\n'; };
+    log('start');
+    const llm = new BrowserLLM();
+    try {
+      await llm.load(
+        (p) => log('progress ' + (p.percent >= 0 ? p.percent.toFixed(0) + '%' : '?') + ' ' + (p.file || '').split('/').pop()),
+        (s) => log('status=' + s),
+      );
+      log('READY device=' + llm.device);
+      const ctx = [{
+        title: 'Assistència en carretera — Arrendament secundari',
+        file: 'documents/x.pdf',
+        text: 'PINCHAZO. La asistencia se prestará incluso si su vehículo no dispone de rueda de repuesto. ' +
+          'En caso de pinchazo, si el experto determina que no es posible realizar una reparación de emergencia ' +
+          'temporal in situ, cuando no se haya dañado la llanta, a diferencia de otras averías, su vehículo podrá ' +
+          'ser remolcado automáticamente al Servicio Autorizado SEAT o al Servicio Especialista CUPRA más cercano ' +
+          'para proceder a la sustitución del (de los) neumático(s) pinchados.',
+      }];
+      const a = await llm.answer('Què hem de fer si punxem una roda?', ctx);
+      log('ANSWER: ' + a.replace(/\n/g, ' / '));
+      const emb = await llm.embedText('passage: prova');
+      log('EMBED: ' + (emb ? emb.length + ' dims' : 'null'));
+      document.title = 'fet';
+    } catch (e) {
+      log('ERROR: ' + (e && e.message ? e.message : e));
+      document.title = 'error';
+    }
+  </script>
+</body>
+</html>

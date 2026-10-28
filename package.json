@@ -1,0 +1,8 @@
+{
+  "name": "seat-arrendament-docs",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "puppeteer-core": "^25.16.0"
+  }
+}
