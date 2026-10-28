@@ -316,12 +316,18 @@
     <h2><span class="num">7</span> Fes una pregunta als documents (IA al navegador)</h2>
     <p class="section-lead">
       Un model d'IA (<code>Qwen2.5-0.5B-Instruct</code>) s'executa <strong>al teu navegador</strong> via
-      <em>Transformers.js</em> (WebGPU si està disponible, i si no, WASM). El model es descarrega la primera
-      vegada (~350&nbsp;MB) i queda en memòria cau del navegador. Les respostes es basen només en els fragments
-      recuperats dels documents, amb la font indicada.
+      <em>Transformers.js</em> (WebGPU si està disponible, i si no, WASM). <strong>El model no es descarrega
+      en obrir la pàgina:</strong> només es baixa quan fas una pregunta al xat i ho confirmes
+      (~350&nbsp;MB la primera vegada; després queda en memòria cau i es carrega de seguida).
+      En qualsevol moment pots <strong>netejar-lo</strong> per alliberar espai. Les respostes es basen
+      només en els fragments recuperats dels documents, amb la font indicada.
     </p>
-    <div class="model-status" id="model-status">
-      <span class="model-dot"></span> El model encara no s'ha carregat…
+    <div class="model-row">
+      <span class="model-status" id="model-status">
+        <span class="model-dot"></span> Model sota demanda — encara no s'ha descarregat
+      </span>
+      <button class="btn btn-small" id="btn-model-download" hidden>⬇ Descarrega el model (~350 MB)</button>
+      <button class="btn btn-small btn-ghost" id="btn-model-clear" hidden>🗑 Neteja el model</button>
     </div>
     <div class="model-progress" id="model-progress" hidden>
       <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>

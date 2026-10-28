@@ -108,12 +108,26 @@ const chatLog = document.getElementById('chat-log');
 const chatInput = document.getElementById('chat-input');
 const chatSend = document.getElementById('chat-send');
 const modelNote = document.getElementById('model-note');
+const btnDownload = document.getElementById('btn-model-download');
+const btnClear = document.getElementById('btn-model-clear');
 
-let chatBusy = false;
+const MODEL_SIZE = '~350 MB';
+let loadStarted = false;
+let pendingQuestions = [];   // preguntes que esperen una resposta del model
+let confirmMsg = null;       // missatge amb la confirmació de descàrrega
+let queueMsg = null;         // missatge d'"en cua" mentre es descarrega
+let answerChain = Promise.resolve();
 
 function setModelStatus(kind, label) {
   modelStatus.className = 'model-status' + (kind ? ` ${kind}` : '');
   modelStatus.innerHTML = `<span class="model-dot"></span> ${label}`;
+}
+
+function refreshModelButtons() {
+  btnDownload.hidden = llm.status === 'ready' || llm.status === 'loading';
+  btnClear.hidden = llm.status !== 'ready';
+  btnDownload.disabled = llm.status === 'loading';
+  btnClear.disabled = false;
 }
 
 function onProgress(p) {
@@ -121,7 +135,7 @@ function onProgress(p) {
   const percent = p.percent >= 0 ? Math.min(99, Math.round(p.percent)) : null;
   progressFill.style.width = percent !== null ? `${percent}%` : '20%';
   progressText.textContent = percent !== null
-    ? `Descarregant el model… ${percent}% (${p.file || ''})`
+    ? `Descarregant el model de ${MODEL_SIZE}… ${percent}% (${p.file || ''})`
     : `Preparant ${p.file || 'el model'}…`;
 }
 
@@ -130,17 +144,19 @@ function onStatus(s) {
     modelProgress.hidden = true;
     progressFill.style.width = '100%';
     setModelStatus('ready', `Model ${LM_LABEL} carregat i preparat (${llm.device || 'local'})`);
-    modelNote.textContent = 'El model s\'executa 100 % al teu navegador. Les preguntes i els documents no surten mai de la teva màquina.';
-    chatSend.disabled = false;
+    modelNote.textContent =
+      'El model s\'executa 100 % al teu navegador. Les preguntes i els documents no surten mai de la teva màquina. Pots netejar-lo quan vulguis.';
+    refreshModelButtons();
     indexSemantic();
   } else if (s === 'loading') {
-    setModelStatus('loading', 'Carregant el model d\'IA al navegador…');
+    setModelStatus('loading', `Descarregant el model d'IA (${MODEL_SIZE})…`);
     modelNote.textContent =
-      'La primera vegada cal descarregar el model (uns 350 MB) des de HuggingFace; després queda en memòria cau i es carrega de seguida.';
+      `La descàrrega (${MODEL_SIZE}) es fa una sola vegada; després el model queda en memòria cau del navegador i es carrega de seguida.`;
+    refreshModelButtons();
   } else if (s === 'error') {
     setModelStatus('error', 'No s\'ha pogut carregar el model. La cerca per paraules clau continua funcionant.');
-    modelNote.textContent = 'Comprova la connexió a internet i que el navegador sigui recent (Chrome/Edge/Firefox).';
-    chatSend.disabled = false;
+    modelNote.textContent = 'Comprova la connexió a internet i que el navegador sigui recent (Chrome/Edge/Firefox). Pots tornar-ho a provar amb el botó de descàrrega.';
+    refreshModelButtons();
   }
 }
 
@@ -173,47 +189,190 @@ function citeHtml(cites) {
   return `<div class="cite">📄 Fonts utilitzades:<br>${items.join('<br>')}</div>`;
 }
 
-async function ask(question) {
-  const q = question.trim();
-  if (!q || chatBusy) return;
-  chatBusy = true;
-  chatSend.disabled = true;
-  addMsg('user', escapeHtml(q));
-  const results = await search.search(q, 6);
-  const botDiv = addMsg('bot', 'Pensant…');
-
+// ---------- Respostes ----------
+async function renderAnswer(botDiv, question) {
+  const results = await search.search(question, 6);
   try {
-    let answer;
-    // Si el model encara s'està descarregant, esperem que acabi abans de respondre
-    if (llm.status === 'loading') {
-      await new Promise((res) => {
-        const wait = () => { if (llm.status !== 'loading') res(); else setTimeout(wait, 500); };
-        wait();
-      });
-    }
-    if (llm.status === 'ready') {
-      answer = await llm.answer(q, contextBlock(results));
-    } else {
-      answer = 'El model d\'IA no s\'ha pogut carregar (mira l\'estat a dalt), però aquí tens els fragments més rellevants dels documents:';
-      botDiv.innerHTML =
-        escapeHtml(answer) +
-        results.map((r, i) =>
-          `<div class="cite">[${i + 1}] <strong>${escapeHtml(r.doc.title)}</strong><br>${escapeHtml(r.text.slice(0, 300))}…</div>`
-        ).join('');
-      return;
-    }
+    const answer = await llm.answer(question, contextBlock(results));
     botDiv.innerHTML = escapeHtml(answer).replace(/\n/g, '<br>') + citeHtml(contextBlock(results));
   } catch (err) {
     console.error(err);
-    botDiv.className = 'msg msg-error';
-    botDiv.textContent = `S'ha produït un error en generar la resposta: ${err.message || err}`;
-    if (!results.length) {
-      botDiv.innerHTML += '<div class="cite">La cerca per paraules clau no va trobar fragments; prova amb «avaria», «substitució», «llanda»…</div>';
-    }
-  } finally {
-    chatBusy = false;
-    chatSend.disabled = llm.status !== 'ready' && llm.status !== 'error' ? true : false;
+    renderFallback(botDiv, results, err);
   }
+}
+
+function renderFallback(botDiv, results, err) {
+  const head = err
+    ? `No s'ha pogut generar amb IA (${escapeHtml((err && err.message) || err)}). Aquí tens els fragments més rellevants dels documents:`
+    : 'El model d\'IA encara no està actiu. Aquí tens els fragments més rellevants dels documents:';
+  botDiv.className = 'msg msg-bot';
+  let html = escapeHtml(head);
+  if (!results.length) {
+    html += '<div class="cite">La cerca per paraules clau no va trobar fragments; prova amb «avaria», «substitució», «llanda»…</div>';
+  } else {
+    html += results.map((r, i) =>
+      `<div class="cite">[${i + 1}] <strong>${escapeHtml(r.doc.title)}</strong><br>${escapeHtml(r.text.slice(0, 300))}…</div>`
+    ).join('');
+  }
+  botDiv.innerHTML = html;
+}
+
+// ---------- Xat ----------
+function ask(question) {
+  const q = question.trim();
+  if (!q) return;
+  addMsg('user', escapeHtml(q));
+
+  if (llm.status === 'ready') {
+    const botDiv = addMsg('bot', 'Pensant…');
+    answerChain = answerChain
+      .then(() => renderAnswer(botDiv, q))
+      .catch((e) => {
+        botDiv.className = 'msg msg-error';
+        botDiv.textContent = `S'ha produït un error: ${(e && e.message) || e}`;
+      });
+    return;
+  }
+
+  if (llm.status === 'loading') {
+    pendingQuestions.push(q);
+    if (!queueMsg) {
+      queueMsg = addMsg('bot', 'El model s\'està descarregant… la pregunta quedarà en cua i es respondrà en acabar.');
+    } else {
+      queueMsg.innerHTML = `El model s'està descarregant… ${pendingQuestions.length} pregunta${pendingQuestions.length > 1 ? 's' : ''} en cua.`;
+    }
+    return;
+  }
+
+  if (llm.status === 'error') {
+    (async () => {
+      const results = await search.search(q, 6);
+      renderFallback(addMsg('bot', ''), results, null);
+    })();
+    return;
+  }
+
+  // Model inactiu: cal confirmar la descàrrega
+  pendingQuestions.push(q);
+  if (!confirmMsg) showConfirmation();
+}
+
+function showConfirmation() {
+  const div = addMsg('bot', '');
+  div.innerHTML =
+    `El model d'IA (<code>Qwen2.5-0.5B-Instruct</code>) pesa uns <strong>${MODEL_SIZE}</strong> i s'ha de descarregar ` +
+    'de HuggingFace la primera vegada (després queda en memòria cau del navegador i no es torna a baixar).<br>' +
+    'Vols descarregar-lo ara per respondre amb IA?' +
+    '<div class="choices">' +
+    `<button class="choice-btn" id="choice-yes">Sí, descarrega el model (${MODEL_SIZE})</button>` +
+    '<button class="choice-btn no" id="choice-no">No, mostra només els fragments</button>' +
+    '</div>';
+  confirmMsg = div;
+
+  div.querySelector('#choice-yes').addEventListener('click', () => {
+    confirmMsg = null;
+    div.innerHTML = `Descarregant el model (${MODEL_SIZE})… quan acabi respondré la teva pregunta.`;
+    startLoad();
+  });
+  div.querySelector('#choice-no').addEventListener('click', () => {
+    confirmMsg = null;
+    div.className = 'msg msg-bot';
+    div.innerHTML = 'Entesos: et mostro els fragments més rellevants. Si més endavant fas una pregunta i ho confirmes, es descarregarà el model.';
+    const queued = pendingQuestions.splice(0);
+    for (const q of queued) {
+      (async () => {
+        const results = await search.search(q, 6);
+        renderFallback(addMsg('bot', ''), results, null);
+      })();
+    }
+  });
+}
+
+// ---------- Càrrega / neteja del model ----------
+function startLoad() {
+  if (loadStarted || llm.status === 'ready') return;
+  loadStarted = true;
+  llm.load(onProgress, onStatus)
+    .then(() => {
+      flushPending();
+    })
+    .catch((e) => {
+      console.error(e);
+      onStatus('error');
+      flushPendingFallback();
+    });
+}
+
+function flushPending() {
+  const queued = pendingQuestions.splice(0);
+  if (queueMsg) {
+    queueMsg.innerHTML = 'Model llest. Responent…';
+    queueMsg = null;
+  }
+  for (const q of queued) {
+    const botDiv = addMsg('bot', 'Pensant…');
+    answerChain = answerChain
+      .then(() => renderAnswer(botDiv, q))
+      .catch((err) => {
+        botDiv.className = 'msg msg-error';
+        botDiv.textContent = `S'ha produït un error: ${(err && err.message) || err}`;
+      });
+  }
+}
+
+function flushPendingFallback() {
+  const queued = pendingQuestions.splice(0);
+  if (queueMsg) {
+    queueMsg.innerHTML = 'No s\'ha pogut descarregar el model: et mostro els fragments.';
+    queueMsg = null;
+  }
+  for (const q of queued) {
+    (async () => {
+      const results = await search.search(q, 6);
+      renderFallback(addMsg('bot', ''), results, new Error('model no descarregat'));
+    })();
+  }
+}
+
+async function clearModel() {
+  btnDownload.disabled = true;
+  btnClear.disabled = true;
+  setModelStatus(null, 'Netejant la memòria cau del model…');
+  let removed = 0;
+  try {
+    if ('caches' in window) {
+      const names = await caches.keys();
+      for (const name of names) {
+        if (/transformers/i.test(name)) {
+          const cache = await caches.open(name);
+          removed += (await cache.keys()).length;
+          await caches.delete(name);
+        }
+      }
+    }
+    try { localStorage.removeItem('transformers.js_config'); } catch { /* opcional */ }
+  } catch (e) {
+    console.error(e);
+  }
+  // Descarrega el model de la memòria: la propera pregunta tornarà a demanar confirmació
+  llm.status = 'idle';
+  llm.lm = null;
+  llm.tokenizer = null;
+  llm.embedder = null;
+  llm.embedderPromise = null;
+  loadStarted = false;
+  semanticIndex = null;
+  search.semantic = null;
+  pendingQuestions = [];
+  confirmMsg = null;
+  queueMsg = null;
+  modelProgress.hidden = true;
+  progressFill.style.width = '0%';
+  setModelStatus(null, removed
+    ? `Model netejat (${removed} fitxers eliminats de la memòria cau). Tornarà a demanar confirmació si fas una pregunta.`
+    : 'No hi havia res a netejar: el model no estava descarregat.');
+  modelNote.textContent = `La propera pregunta et tornarà a demanar si vols descarregar el model (${MODEL_SIZE}). La cerca per paraules clau funciona sempre.`;
+  refreshModelButtons();
 }
 
 chatSend.addEventListener('click', () => { ask(chatInput.value); chatInput.value = ''; });
@@ -223,6 +382,9 @@ chatInput.addEventListener('keydown', (e) => {
 document.querySelectorAll('.chip').forEach((chip) => {
   chip.addEventListener('click', () => { ask(chip.textContent); });
 });
+
+btnDownload.addEventListener('click', () => { startLoad(); });
+btnClear.addEventListener('click', () => { clearModel(); });
 
 // ---------- Cerca semàntica (opcional, en segon pla) ----------
 let semanticIndex = null;
@@ -269,12 +431,6 @@ async function indexSemantic() {
 
 // ---------- Inici ----------
 renderDocs();
-setModelStatus('loading', 'Carregant el model d\'IA al navegador…');
-setTimeout(() => {
-  llm.load(onProgress, onStatus).catch((e) => {
-    console.error(e);
-    onStatus('error');
-  });
-}, 800);
-
-modelNote.textContent = `Model: ${LM_MODEL} · Transformers.js · s\'executa al teu navegador.`;
+setModelStatus(null, `Model sota demanda — encara no s'ha descarregat (${MODEL_SIZE} la primera vegada)`);
+modelNote.textContent = `El model (${LM_MODEL}) només es descarrega quan fas una pregunta al xat i ho confirmes. Aquí també el pots descarregar o netejar manualment.`;
+refreshModelButtons();

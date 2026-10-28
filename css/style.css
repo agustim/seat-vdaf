@@ -296,6 +296,17 @@ blockquote {
 mark { background: #ffe58f; border-radius: 3px; padding: 0 2px; }
 
 /* ---------- Xat ---------- */
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.btn-small { padding: 8px 14px; font-size: 13px; border-radius: 8px; }
+.btn-ghost { background: #fff; color: var(--accent-dark); border: 1.5px solid var(--accent); }
+.btn-ghost:hover { background: var(--accent-soft); }
+
 .model-status {
   display: inline-flex;
   align-items: center;
@@ -305,7 +316,6 @@ mark { background: #ffe58f; border-radius: 3px; padding: 0 2px; }
   border-radius: 999px;
   padding: 8px 16px;
   font-size: 13.5px;
-  margin: 10px 0;
 }
 .model-dot { width: 10px; height: 10px; border-radius: 50%; background: #9ca3af; }
 .model-status.ready .model-dot { background: var(--ok); }
@@ -331,6 +341,22 @@ mark { background: #ffe58f; border-radius: 3px; padding: 0 2px; }
 .msg-bot { align-self: flex-start; background: #f1f3f6; border: 1px solid var(--line); }
 .msg-bot .cite { display: block; font-size: 12px; color: #6b7280; margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
 .msg-error { align-self: flex-start; background: #fdeceb; border: 1px solid #f3c4c1; color: #8a2a25; }
+
+/* Botons de confirmació dins del xat (descarregar model sí/no) */
+.msg-bot .choices { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.choice-btn {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  border: 1.5px solid #cfe0a2;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.choice-btn:hover { background: var(--accent); color: #fff; }
+.choice-btn.no { background: #fff; border-color: var(--line); color: var(--ink-soft); }
+.choice-btn.no:hover { background: #eef0f3; }
 .chat-input-row { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--line); }
 .chat-chips { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 14px 14px; }
 .chip {

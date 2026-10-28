@@ -51,9 +51,13 @@ python3 -m http.server 8000
 
 ### Nota sobre el model d'IA
 
-El model (≈350 MB) es descarrega **la primera vegada** des d'HuggingFace i després queda
-en **memòria cau del navegador**; la resta de la pàgina (continguts i cerca per paraules clau)
-funciona sense connexió. Recomanat Chrome/Edge o Firefox recent (WebGPU accelera molt
+El model **no es descarrega en obrir la pàgina**: només es baixa quan fas una pregunta
+al xat i ho confirmes (~350 MB, Xat consta la confirmació amb el pes i es pot rebutjar per
+veure només els fragments recuperats per la cerca). Un cop descarregat queda en
+**memòria cau del navegador** (Cache API) i es pot **netejar** en qualsevol moment amb el
+botó «🗑 Neteja el model», que allibera l'espai i torna a demanar confirmació la propera
+pregunta. La resta de la pàgina (continguts i cerca per paraules clau) funciona sense
+connexió ni descàrrega. Recomanat Chrome/Edge o Firefox recent (WebGPU accelera molt
 la generació; sense WebGPU funciona amb WASM, més lent).
 
 ## Estructura

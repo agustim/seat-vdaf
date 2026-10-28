@@ -119,7 +119,7 @@ export class BrowserLLM {
       'L\'assistència es presta fins i tot si el cotxe no té roda de recanvi; si no es pot reparar sobre la marxa, ' +
       'el vehicle es remolca al Servei Autoritzat SEAT més proper per substituir el pneumàtic [1].';
 
-    const user = `Pregunta: ${question}\n\nFRAGMENTS DE DOCUMENTACIÓ:\n${frags}`;
+    const user = `Pregunta: ${question}\n\nFRAGMENTS DE DOCUMENTACIÓ:\n${frags}\n\nRecorda: respon en català (encara que els fragments estiguin en castellà) i cita les fonts al final amb [n].`;
 
     let input_ids;
     try {
