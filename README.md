@@ -43,9 +43,11 @@ python3 -m http.server 8000
    ```
 2. El repositori ja inclou el workflow
    [`.github/workflows/pages.yml`](.github/workflows/pages.yml), que publica automàticament
-   el lloc a **GitHub Pages** (cal activar Pages al repositori:
-   *Settings → Pages → Source: GitHub Actions*). També es pot activar
-   el desplegament manual des de *Actions → Deploy to GitHub Pages*.
+   el lloc a **GitHub Pages** (Pages ja queda **activat automàticament** amb l'opció
+   `enablement: true`; si el token del workflow no pogués activar-lo, activa'l manualment a
+   *Settings → Pages → Source: GitHub Actions*). El lloc queda publicat a
+   `https://<usuari>.github.io/<repositori>/` (en aquest cas:
+   <https://agustim.github.io/seat-vdaf/>).
 
 ### Nota sobre el model d'IA
 
